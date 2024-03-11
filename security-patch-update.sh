@@ -28,9 +28,9 @@ ECHO_INFO()
 {
     if [ X"$1" == X"-n" ]; then
         shift 1
-        echo -ne "${_INFO_FLAG} $@"
+        echo -ne "\033[1;32m${_INFO_FLAG} $@\033[00m"
     else
-        echo -e "${_INFO_FLAG} $@"
+        echo -e "\033[1;32m${_INFO_FLAG} $@\033[00m"
     fi
 }
 
@@ -67,7 +67,7 @@ if [ X"$?" == X"0" ]; then
 
 ECHO_INFO "Running the apt-get upgrade command" | tee -a ${LOG}
 sleep 1
-sudo apt-get upgrade -y | tee -a ${LOG}
+sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y | tee -a ${LOG}
 if [ X"$?" == X"0" ]; then
 ECHO_INFO "Security patch update was completed"
 else 
