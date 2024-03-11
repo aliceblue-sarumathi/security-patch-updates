@@ -59,7 +59,7 @@ ECHO_DEBUG()
 
 ECHO_INFO "Running the apt-get update command" | tee -a ${LOG}
 sleep 1
-sudo apt-get udpate | tee -a ${LOG}
+sudo apt-get update | tee -a ${LOG}
 if [ X"$?" == X"0" ]; then
 
 sleep 2
