@@ -62,12 +62,10 @@ sleep 1
 sudo apt-get update | tee -a ${LOG}
 if [ X"$?" == X"0" ]; then
 
-sleep 2
-ECHO_INFO "Running apt upgradable to list the " | tee -a ${LOG}
+ECHO_INFO "Running apt upgradable to list the packages" | tee -a ${LOG}
 sleep 1
 sudo apt list --upgradable | tee -a ${LOG}
 if [ X"$?" == X"0" ]; then 
-sleep 2
 
 ECHO_INFO "Running the apt-get upgrade command" | tee -a ${LOG}
 sleep 1
