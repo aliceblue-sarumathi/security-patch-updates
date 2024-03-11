@@ -32,7 +32,7 @@ ECHO_INFO()
     else
         echo -e "${_INFO_FLAG} $@"
     fi
-    echo -e "${_INFO_FLAG} $@" >> ${INSTALL_LOG}
+    echo -e "${_INFO_FLAG} $@" 
 }
 
 ECHO_QUESTION()
@@ -48,12 +48,12 @@ ECHO_QUESTION()
 ECHO_ERROR()
 {
     echo -e "${_ERROR_FLAG} $@"
-    echo -e "${_ERROR_FLAG} $@" >> ${INSTALL_LOG}
+    echo -e "${_ERROR_FLAG} $@"
 }
 
 ECHO_DEBUG()
 {
-    echo -e "${_DEBUG_FLAG} $@" >> ${INSTALL_LOG}
+    echo -e "${_DEBUG_FLAG} $@"
 }
 
 
