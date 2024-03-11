@@ -69,6 +69,9 @@ ECHO_INFO "Running the apt-get upgrade command" | tee -a ${LOG}
 sleep 1
 sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y | tee -a ${LOG}
 if [ X"$?" == X"0" ]; then
+ECHO_INFO "Running the apt-get autoremove command" | tee -a ${LOG}
+sleep 1
+sudo apt-get autoremove -y
 ECHO_INFO "Security patch update was completed"
 else 
 ECHO_ERROR "Their is a issue on running the command. Retrying again" | tee -a ${LOG}
