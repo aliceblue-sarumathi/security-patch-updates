@@ -67,7 +67,8 @@ if [ X"$?" == X"0" ]; then
 
 ECHO_INFO "Running the apt-get upgrade command" | tee -a ${LOG}
 sleep 1
-sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y | tee -a ${LOG}
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y | tee -a ${LOG}
 if [ X"$?" == X"0" ]; then
 ECHO_INFO "Running the apt-get autoremove command" | tee -a ${LOG}
 sleep 1
@@ -76,7 +77,8 @@ ECHO_INFO "Security patch update was completed"
 else 
 ECHO_ERROR "Their is a issue on running the command. Retrying again" | tee -a ${LOG}
 sudo dpkg --reconfigure -a | tee -a ${LOG}
-sudo apt-get upgrade -y | tee -a ${LOG}
+export DEBIAN_FRONTEND=noninteractive
+sudo apt-get -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade -y | tee -a ${LOG}
 fi
 else 
 ECHO_ERROR "Their is a issue on running the command please check ..." | tee -a ${LOG}
@@ -84,5 +86,3 @@ fi
 else
 ECHO_ERROR "Unable to complete the APT-UPDATE. Please check Log...." | tee -a ${LOG}
 fi
-
-
