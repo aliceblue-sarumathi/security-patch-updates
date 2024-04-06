@@ -92,9 +92,3 @@ fi
 else
 ECHO_ERROR "Unable to complete the APT-UPDATE. Please check Log...." | tee -a ${LOG}
 fi
-
-DEBIAN_FRONTEND=noninteractive \
-  apt-get \
-  -o Dpkg::Options::=--force-confold \
-  -o Dpkg::Options::=--force-confdef \
-  -y --allow-downgrades --allow-remove-essential --allow-change-held-packages
