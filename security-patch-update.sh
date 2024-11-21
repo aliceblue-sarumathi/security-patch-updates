@@ -15,88 +15,85 @@
 
 
 export DT="$(/bin/date +%Y-%m-%d-%H-%M-%S)"
-export LOG="security-patch-log-${DT}"
+export YEAR="$(/bin/date +%Y)"
+export MONTH="$(/bin/date +%m)"
 export OUTPUT_DIR="output"
-export UPGRADE_FILE="${OUTPUT_DIR}/security-patch-log-$(/bin/date +%Y-%m-%d).txt"
+export LOG_DIR="${OUTPUT_DIR}/log/${YEAR}/${MONTH}"
+export UPGRADE_LIST_DIR="${OUTPUT_DIR}/upgrade-list/${YEAR}/${MONTH}"
 
-[ -f ${LOG} ] && . ${LOG}
+# Define servers with their respective SSH usernames, hostnames, SSH key paths, and custom SSH ports
+declare -A SERVERS=(
+    ["uat-1"]="root@192.168.40.33:/home/test/audit-bash/uat-1:22"
+    ["uat-2"]="root@223.31.190.212:/home/test/audit-bash/uat-2:22"
+)
 
-export _INFO_FLAG="[ INFO ]"
-export _ERROR_FLAG="<< ERROR >>"
-export _DEBUG_FLAG=" + < DEBUG >"
-export _QUESTION_FLAG="< Question >"
-
-ECHO_INFO()
-{
-    if [ X"$1" == X"-n" ]; then
-        shift 1
-        echo -ne "\033[1;32m${_INFO_FLAG} $@\033[00m"
-    else
-        echo -e "\033[1;32m${_INFO_FLAG} $@\033[00m"
+# Create output directories if they don't exist
+for dir in "${LOG_DIR}" "${UPGRADE_LIST_DIR}"; do
+    if [ ! -d "${dir}" ]; then
+        mkdir -p "${dir}"
+        echo "[ INFO ] Created directory: ${dir}"
     fi
-}
+done
 
-ECHO_QUESTION()
-{
-    if [ X"$1" == X"-n" ]; then
-        shift 1
-        echo -ne "${_QUESTION_FLAG} $@"
-    else
-        echo -e "${_QUESTION_FLAG} $@"
-    fi
-}
+# Function to execute commands on a remote server
+run_remote_security_patch() {
+    local server_name=$1
+    local ssh_details=$2
 
-ECHO_ERROR()
-{
-    echo -e "${_ERROR_FLAG} $@"
-}
+    # Extract username, hostname, path, and port from ssh_details
+    local username=$(echo "${ssh_details}" | cut -d@ -f1)
+    local host=$(echo "${ssh_details}" | cut -d@ -f2 | cut -d: -f1)
+    local key_path=$(echo "${ssh_details}" | cut -d: -f2)
+    local port=$(echo "${ssh_details}" | cut -d: -f3)
 
-ECHO_DEBUG()
-{
-    echo -e "${_DEBUG_FLAG} $@"
-}
+    local log_file="${LOG_DIR}/${server_name}-security-patch-log-${DT}.txt"
+    local upgrade_list_file="${UPGRADE_LIST_DIR}/${server_name}-upgrade-list-${DT}.txt"
 
-# Create output directory if it doesn't exist
-if [ ! -d "${OUTPUT_DIR}" ]; then
-    mkdir -p "${OUTPUT_DIR}"
-    ECHO_INFO "Created output directory: ${OUTPUT_DIR}" | tee -a ${LOG}
-fi
+    echo "[ INFO ] Starting security patch update on ${server_name} (${host})"
+    ssh -i "${key_path}" -p "${port}" "${username}@${host}" <<EOF | tee "${log_file}"
+        TEMP_UPGRADE_LIST="/tmp/${server_name}-upgrade-list.txt"
+        echo "[ INFO ] Running apt-get update"
+        sudo apt-get update
 
-ECHO_INFO "Running the apt-get update command" | tee -a ${LOG}
-sleep 1
-sudo apt-get update | tee -a ${LOG}
-if [ X"$?" == X"0" ]; then
+        if [ X"\$?" == X"0" ]; then
+            echo "[ INFO ] Listing upgradable packages"
+            sudo apt list --upgradable > "\${TEMP_UPGRADE_LIST}"
 
-    ECHO_INFO "Running apt upgradable to list the packages" | tee -a ${LOG}
-    sleep 1
-    sudo apt list --upgradable | tee -a ${LOG} | tee "${UPGRADE_FILE}"
-    if [ X"$?" == X"0" ]; then 
-
-        ECHO_INFO "Running the apt-get upgrade command" | tee -a ${LOG}
-        sleep 1
-        DEBIAN_FRONTEND=noninteractive \
-        apt-get \
-        -o Dpkg::Options::="--force-confdef" \
-        -o Dpkg::Options::="--force-confold" \
-        upgrade -y | tee -a ${LOG}
-        
-        if [ X"$?" == X"0" ]; then
-            ECHO_INFO "Running the apt-get autoremove command" | tee -a ${LOG}
-            sleep 1
-            sudo apt-get autoremove -y
-            ECHO_INFO "Security patch update was completed"
-        else 
-            ECHO_ERROR "There is an issue running the upgrade command. Retrying again" | tee -a ${LOG}
-            sudo dpkg --reconfigure -a | tee -a ${LOG}
-            DEBIAN_FRONTEND=noninteractive \
-            apt-get \
-            -o Dpkg::Options::="--force-confdef" \
-            -o Dpkg::Options::="--force-confold" \
-            upgrade -y | tee -a ${LOG}
+            if [ X"\$?" == X"0" ]; then
+                echo "[ INFO ] Running apt-get upgrade"
+                DEBIAN_FRONTEND=noninteractive \
+                sudo apt-get \
+                -o Dpkg::Options::="--force-confdef" \
+                -o Dpkg::Options::="--force-confold" \
+                upgrade -y
+                
+                if [ X"\$?" == X"0" ]; then
+                    echo "[ INFO ] Running apt-get autoremove"
+                    sudo apt-get autoremove -y
+                    echo "[ INFO ] Security patch update completed for ${server_name}"
+                else
+                    echo "[ ERROR ] Issue encountered during apt-get upgrade. Retrying..."
+                    sudo dpkg --configure -a
+                    DEBIAN_FRONTEND=noninteractive \
+                    sudo apt-get \
+                    -o Dpkg::Options::="--force-confdef" \
+                    -o Dpkg::Options::="--force-confold" \
+                    upgrade -y
+                fi
+            else
+                echo "[ ERROR ] Unable to list upgradable packages. Exiting..."
+            fi
+        else
+            echo "[ ERROR ] Unable to complete apt-get update. Exiting..."
         fi
-    else 
-        ECHO_ERROR "There is an issue running the upgradable list command. Please check ..." | tee -a ${LOG}
-    fi
-else
-    ECHO_ERROR "Unable to complete the APT-UPDATE. Please check Log...." | tee -a ${LOG}
-fi
+EOF
+    # Retrieve the upgrade-list file from the remote server
+    scp -i "${key_path}" -P "${port}" "${username}@${host}:/tmp/${server_name}-upgrade-list.txt" "${upgrade_list_file}"
+    echo "[ INFO ] Logs saved to: ${log_file}"
+    echo "[ INFO ] Upgrade list saved to: ${upgrade_list_file}"
+}
+
+# Loop through servers and run the security patch update
+for server_name in "${!SERVERS[@]}"; do
+    run_remote_security_patch "${server_name}" "${SERVERS[$server_name]}"
+done
