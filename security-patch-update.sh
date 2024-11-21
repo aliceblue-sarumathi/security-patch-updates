@@ -16,6 +16,8 @@
 
 export DT="$(/bin/date +%Y-%m-%d-%H-%M-%S)"
 export LOG="security-patch-log-${DT}"
+export OUTPUT_DIR="output"
+export UPGRADE_FILE="${OUTPUT_DIR}/security-patch-log-$(/bin/date +%Y-%m-%d).txt"
 
 [ -f ${LOG} ] && . ${LOG}
 
@@ -54,41 +56,47 @@ ECHO_DEBUG()
     echo -e "${_DEBUG_FLAG} $@"
 }
 
+# Create output directory if it doesn't exist
+if [ ! -d "${OUTPUT_DIR}" ]; then
+    mkdir -p "${OUTPUT_DIR}"
+    ECHO_INFO "Created output directory: ${OUTPUT_DIR}" | tee -a ${LOG}
+fi
 
 ECHO_INFO "Running the apt-get update command" | tee -a ${LOG}
 sleep 1
 sudo apt-get update | tee -a ${LOG}
 if [ X"$?" == X"0" ]; then
 
-ECHO_INFO "Running apt upgradable to list the packages" | tee -a ${LOG}
-sleep 1
-sudo apt list --upgradable | tee -a ${LOG}
-if [ X"$?" == X"0" ]; then 
+    ECHO_INFO "Running apt upgradable to list the packages" | tee -a ${LOG}
+    sleep 1
+    sudo apt list --upgradable | tee -a ${LOG} | tee "${UPGRADE_FILE}"
+    if [ X"$?" == X"0" ]; then 
 
-ECHO_INFO "Running the apt-get upgrade command" | tee -a ${LOG}
-sleep 1
-DEBIAN_FRONTEND=noninteractive \
-  apt-get \
- -o Dpkg::Options::="--force-confdef" \
- -o Dpkg::Options::="--force-confold" \
-  upgrade -y | tee -a ${LOG}
-if [ X"$?" == X"0" ]; then
-ECHO_INFO "Running the apt-get autoremove command" | tee -a ${LOG}
-sleep 1
-sudo apt-get autoremove -y
-ECHO_INFO "Security patch update was completed"
-else 
-ECHO_ERROR "Their is a issue on running the command. Retrying again" | tee -a ${LOG}
-sudo dpkg --reconfigure -a | tee -a ${LOG}
-DEBIAN_FRONTEND=noninteractive \
-  apt-get \
- -o Dpkg::Options::="--force-confdef" \
- -o Dpkg::Options::="--force-confold" \
-  upgrade -y | tee -a ${LOG}
-fi
-else 
-ECHO_ERROR "Their is a issue on running the command please check ..." | tee -a ${LOG}
-fi
+        ECHO_INFO "Running the apt-get upgrade command" | tee -a ${LOG}
+        sleep 1
+        DEBIAN_FRONTEND=noninteractive \
+        apt-get \
+        -o Dpkg::Options::="--force-confdef" \
+        -o Dpkg::Options::="--force-confold" \
+        upgrade -y | tee -a ${LOG}
+        
+        if [ X"$?" == X"0" ]; then
+            ECHO_INFO "Running the apt-get autoremove command" | tee -a ${LOG}
+            sleep 1
+            sudo apt-get autoremove -y
+            ECHO_INFO "Security patch update was completed"
+        else 
+            ECHO_ERROR "There is an issue running the upgrade command. Retrying again" | tee -a ${LOG}
+            sudo dpkg --reconfigure -a | tee -a ${LOG}
+            DEBIAN_FRONTEND=noninteractive \
+            apt-get \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            upgrade -y | tee -a ${LOG}
+        fi
+    else 
+        ECHO_ERROR "There is an issue running the upgradable list command. Please check ..." | tee -a ${LOG}
+    fi
 else
-ECHO_ERROR "Unable to complete the APT-UPDATE. Please check Log...." | tee -a ${LOG}
+    ECHO_ERROR "Unable to complete the APT-UPDATE. Please check Log...." | tee -a ${LOG}
 fi
